@@ -1,0 +1,55 @@
+<?php
+// $Id$
+
+/**
+ * @file
+ * Install file.
+ *
+ * @author Davy Van Den Bremt
+ */
+
+/**
+ * Implementation of hook_install().
+ */
+function webform_submissions_acl_install() {
+  drupal_install_schema('webform_submissions_acl');
+}
+
+/**
+ * Implementation of hook_uninstall().
+ */
+function webform_submissions_acl_uninstall() {
+  drupal_uninstall_schema('webform_submissions_acl');
+
+  db_query("DELETE FROM {variable} WHERE name LIKE 'webform_submissions_acl_%'");
+  cache_clear_all('variables', 'cache');
+}
+
+/**
+ * Implementation of hook_schema().
+ *
+ * Create the table for webform_submissions_acl entries.
+ */
+function webform_submissions_acl_schema() {
+  $schema['webform_submissions_acl'] = array(
+    'fields' => array(
+      'nid' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0
+      ),
+      'uid' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0
+      ),
+     ),
+    'primary key' => array(),
+    'indexes' => array(
+      'uid' => array('nid'),
+      'uid' => array('uid')
+     ),
+  );
+
+  return $schema;
+}

@@ -1,0 +1,112 @@
+<?php
+// $Id$
+
+/**
+ * @file
+ * Drupal hooks and helper functions.
+ *
+ * @author Davy Van Den Bremt
+ */
+
+/**
+ * Implementation of hook_menu().
+ */
+function webform_submissions_acl_menu() {
+  $items = array();
+
+  $items['node/%webform_menu/edit/acl'] = array(
+    'title' => 'ACL',
+    'page callback' => 'webform_submissions_acl_page',
+    'page arguments' => array('webform_submissions_acl_page', 1),
+    'access callback' => 'node_access',
+    'access arguments' => array('update', 1),
+    'file' => 'webform_submissions_acl.pages.inc',
+    'weight' => 3,
+    'type' => MENU_LOCAL_TASK,
+  );
+
+  $items['node/%webform_menu/edit/acl/delete/%user'] = array(
+    'title' => 'ACL',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('webform_submissions_acl_delete_confirm_form', 1, 5),
+    'access callback' => 'node_access',
+    'access arguments' => array('update', 1),
+    'file' => 'webform_submissions_acl.pages.inc',
+    'type' => MENU_CALLBACK,
+  );
+
+  return $items;
+}
+
+/**
+ * Implementation of hook_menu_alter().
+ */
+function webform_submissions_acl_menu_alter(&$callbacks) {
+  $callbacks['node/%webform_menu/webform-results']['access callback'] = 'webform_submissions_acl_access';
+  $callbacks['node/%webform_menu/webform-results']['access arguments'] = array(1, 'access webform results');
+
+  $callbacks['node/%webform_menu/webform-results/analysis']['access callback'] = 'webform_submissions_acl_access';
+  $callbacks['node/%webform_menu/webform-results/analysis']['access arguments'] = array(1, 'access webform results');
+
+  $callbacks['node/%webform_menu/webform-results/table']['access callback'] = 'webform_submissions_acl_access';
+  $callbacks['node/%webform_menu/webform-results/table']['access arguments'] = array(1, 'access webform results');
+
+  $callbacks['node/%webform_menu/webform-results/download']['access callback'] = 'webform_submissions_acl_access';
+  $callbacks['node/%webform_menu/webform-results/download']['access arguments'] = array(1, 'access webform results');
+}
+
+/**
+ * Menu access callback. Ensure a user both access (permission or acl) and node 'view' permission.
+ */
+function webform_submissions_acl_access($node, $perm) {
+  global $user;
+  $node_users = webform_submissions_acl_users_by_node($node->nid, TRUE);
+  return node_access('view', $node) && (user_access($perm) || in_array($user->uid, $node_users));
+}
+
+/**
+ * Implementation of hook_theme().
+ */
+function webform_submissions_acl_theme($existing, $type, $theme, $path) {
+  return array(
+    'webform_submissions_acl_page' => array(
+      'arguments' => array(
+        'form' => '',
+        'node' => NULL,
+        'users' => array()
+      ),
+    ),
+  );
+}
+
+function webform_submissions_acl_users_by_node($nid, $id_only = FALSE) {
+  $users = array();
+  $result = db_query("SELECT wsa.uid, u.name FROM {webform_submissions_acl} wsa INNER JOIN {users} u ON u.uid = wsa.uid WHERE wsa.nid = %d", $nid);
+  while ($row = db_fetch_object($result)) {
+    if ($id_only) {
+      $users[] = $row->uid;
+    }
+    else {
+      $users[] = $row;
+    }
+  }
+  return $users;
+}
+
+function webform_submissions_acl_nodes_by_user($uid, $id_only = FALSE) {
+  $nodes = array();
+  $result = db_query("SELECT wsa.nid, wsa.title FROM {webform_submissions_acl} wsa INNER JOIN {node} n ON n.nid = wsa.nid WHERE wsa.uid = %d", $uid);
+  while ($row = db_fetch_object($result)) {
+    if ($id_only) {
+      $nodes[] = $row->nid;
+    }
+    else {
+      $nodes[] = $row;
+    }
+  }
+  return $nodes;
+}
+
+function webform_submissions_acl_delete($nid, $uid) {
+  db_query("DELETE FROM {webform_submissions_acl} WHERE nid = %d AND uid = %d", $nid, $uid);
+}
