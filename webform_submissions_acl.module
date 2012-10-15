@@ -40,6 +40,14 @@ function webform_submissions_acl_menu() {
   return $items;
 }
 
+function webform_submissions_acl_admin_paths() {
+  $paths = array(
+    'node/*/acl' => TRUE,
+    'node/*/acl/delete/%user' => TRUE,
+  );
+  return $paths;
+}
+
 /**
  * Implementation of hook_menu_alter().
  */
