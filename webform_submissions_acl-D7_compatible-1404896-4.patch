@@ -1,0 +1,329 @@
+diff --git a/webform_submissions_acl.info b/webform_submissions_acl.info
+index 96f3e73..8870539 100644
+--- a/webform_submissions_acl.info
++++ b/webform_submissions_acl.info
+@@ -1,4 +1,6 @@
+ name = Webform Submissions ACL
+ description = "Grant individual users access to the results of specific webforms."
+-core = 6.x
+-dependencies[] = webform
+\ No newline at end of file
++version = "7.x-1.x-dev"
++core = 7.x
++package = Webform
++dependencies[] = webform
+diff --git a/webform_submissions_acl.install b/webform_submissions_acl.install
+index bcc986e..79da418 100644
+--- a/webform_submissions_acl.install
++++ b/webform_submissions_acl.install
+@@ -1,4 +1,5 @@
+ <?php
++// $Id: webform_submissions_acl.install,v 1.1 2009/10/30 17:49:17 davyvandenbremt Exp $
+ 
+ /**
+  * @file
+@@ -8,23 +9,6 @@
+  */
+ 
+ /**
+- * Implementation of hook_install().
+- */
+-function webform_submissions_acl_install() {
+-  drupal_install_schema('webform_submissions_acl');
+-}
+-
+-/**
+- * Implementation of hook_uninstall().
+- */
+-function webform_submissions_acl_uninstall() {
+-  drupal_uninstall_schema('webform_submissions_acl');
+-
+-  db_query("DELETE FROM {variable} WHERE name LIKE 'webform_submissions_acl_%'");
+-  cache_clear_all('variables', 'cache');
+-}
+-
+-/**
+  * Implementation of hook_schema().
+  *
+  * Create the table for webform_submissions_acl entries.
+@@ -49,6 +33,5 @@ function webform_submissions_acl_schema() {
+       'uid' => array('uid')
+      ),
+   );
+-
+   return $schema;
+-}
+\ No newline at end of file
++}
+diff --git a/webform_submissions_acl.module b/webform_submissions_acl.module
+index 1708ce2..1f9564a 100644
+--- a/webform_submissions_acl.module
++++ b/webform_submissions_acl.module
+@@ -1,10 +1,16 @@
+ <?php
++// $Id: webform_submissions_acl.module,v 1.1 2009/10/30 17:49:17 davyvandenbremt Exp $
+ 
+ /**
+  * @file
+  * Drupal hooks and helper functions.
+  *
+  * @author Davy Van Den Bremt
++ * Modified by: Edouard Poitras <epoitras@layer8.org> on June 27th, 2012 in an attempt
++ * to get it working with Drupal 7
++ * Thanks to pbosmans (drupal username) for the permissions fix @ http://drupal.org/node/1561834
++ * Thanks to Matt B (drupal username) for the module package placement idea @ http://drupal.org/node/1111124
++ * Thanks to Zyxtrio (drupal username) for the role based ACL code @ http://drupal.org/node/636612
+  */
+ 
+ /**
+@@ -12,8 +18,7 @@
+  */
+ function webform_submissions_acl_menu() {
+   $items = array();
+-
+-  $items['node/%webform_menu/edit/acl'] = array(
++  $items['node/%webform_menu/acl'] = array(
+     'title' => 'ACL',
+     'page callback' => 'webform_submissions_acl_page',
+     'page arguments' => array('webform_submissions_acl_page', 1),
+@@ -23,8 +28,7 @@ function webform_submissions_acl_menu() {
+     'weight' => 3,
+     'type' => MENU_LOCAL_TASK,
+   );
+-
+-  $items['node/%webform_menu/edit/acl/delete/%user'] = array(
++  $items['node/%webform_menu/acl/delete/%user'] = array(
+     'title' => 'ACL',
+     'page callback' => 'drupal_get_form',
+     'page arguments' => array('webform_submissions_acl_delete_confirm_form', 1, 5),
+@@ -33,7 +37,6 @@ function webform_submissions_acl_menu() {
+     'file' => 'webform_submissions_acl.pages.inc',
+     'type' => MENU_CALLBACK,
+   );
+-
+   return $items;
+ }
+ 
+@@ -42,16 +45,19 @@ function webform_submissions_acl_menu() {
+  */
+ function webform_submissions_acl_menu_alter(&$callbacks) {
+   $callbacks['node/%webform_menu/webform-results']['access callback'] = 'webform_submissions_acl_access';
+-  $callbacks['node/%webform_menu/webform-results']['access arguments'] = array(1, 'access webform results');
+-
++  $callbacks['node/%webform_menu/webform-results']['access arguments'] = array(1, 'access own webform results');
+   $callbacks['node/%webform_menu/webform-results/analysis']['access callback'] = 'webform_submissions_acl_access';
+-  $callbacks['node/%webform_menu/webform-results/analysis']['access arguments'] = array(1, 'access webform results');
+-
++  $callbacks['node/%webform_menu/webform-results/analysis']['access arguments'] = array(1, 'access own webform results');
+   $callbacks['node/%webform_menu/webform-results/table']['access callback'] = 'webform_submissions_acl_access';
+-  $callbacks['node/%webform_menu/webform-results/table']['access arguments'] = array(1, 'access webform results');
+-
++  $callbacks['node/%webform_menu/webform-results/table']['access arguments'] = array(1, 'access own webform results');
+   $callbacks['node/%webform_menu/webform-results/download']['access callback'] = 'webform_submissions_acl_access';
+-  $callbacks['node/%webform_menu/webform-results/download']['access arguments'] = array(1, 'access webform results');
++  $callbacks['node/%webform_menu/webform-results/download']['access arguments'] = array(1, 'access own webform results');
++  $callbacks['node/%webform_menu/webform-results/submissions']['access callback'] = 'webform_submissions_acl_access';
++  $callbacks['node/%webform_menu/webform-results/submissions']['access arguments'] = array(1, 'access own webform results');
++  $callbacks['node/%webform_menu/submissions']['access callback'] = 'webform_submissions_acl_access';
++  $callbacks['node/%webform_menu/submissions']['access arguments'] = array(1, 'access own webform results');
++  $callbacks['node/%webform_menu/submission/%webform_menu_submission']['access callback'] = 'webform_submissions_acl_access';
++  $callbacks['node/%webform_menu/submission/%webform_menu_submission']['access arguments'] = array(1, 'access own webform results');
+ }
+ 
+ /**
+@@ -60,7 +66,7 @@ function webform_submissions_acl_menu_alter(&$callbacks) {
+ function webform_submissions_acl_access($node, $perm) {
+   global $user;
+   $node_users = webform_submissions_acl_users_by_node($node->nid, TRUE);
+-  return node_access('view', $node) && (user_access($perm) || in_array($user->uid, $node_users));
++  return node_access('view', $node) && (user_access('access all webform results') || ((user_access($perm) && ($user->uid == $node->uid)) || in_array($user->uid, $node_users)));
+ }
+ 
+ /**
+@@ -69,7 +75,7 @@ function webform_submissions_acl_access($node, $perm) {
+ function webform_submissions_acl_theme($existing, $type, $theme, $path) {
+   return array(
+     'webform_submissions_acl_page' => array(
+-      'arguments' => array(
++      'variables' => array(
+         'form' => '',
+         'node' => NULL,
+         'users' => array()
+@@ -80,8 +86,8 @@ function webform_submissions_acl_theme($existing, $type, $theme, $path) {
+ 
+ function webform_submissions_acl_users_by_node($nid, $id_only = FALSE) {
+   $users = array();
+-  $result = db_query("SELECT wsa.uid, u.name FROM {webform_submissions_acl} wsa INNER JOIN {users} u ON u.uid = wsa.uid WHERE wsa.nid = %d", $nid);
+-  while ($row = db_fetch_object($result)) {
++  $result = db_query("SELECT wsa.uid, u.name FROM {webform_submissions_acl} wsa INNER JOIN {users} u ON u.uid = wsa.uid WHERE wsa.nid = :nid", array(':nid' => $nid));
++  foreach ($result as $row) {
+     if ($id_only) {
+       $users[] = $row->uid;
+     }
+@@ -94,8 +100,8 @@ function webform_submissions_acl_users_by_node($nid, $id_only = FALSE) {
+ 
+ function webform_submissions_acl_nodes_by_user($uid, $id_only = FALSE) {
+   $nodes = array();
+-  $result = db_query("SELECT wsa.nid, wsa.title FROM {webform_submissions_acl} wsa INNER JOIN {node} n ON n.nid = wsa.nid WHERE wsa.uid = %d", $uid);
+-  while ($row = db_fetch_object($result)) {
++  $result = db_query("SELECT wsa.nid, wsa.title FROM {webform_submissions_acl} wsa INNER JOIN {node} n ON n.nid = wsa.nid WHERE wsa.uid = " . $uid);
++  foreach ($result as $row) {
+     if ($id_only) {
+       $nodes[] = $row->nid;
+     }
+@@ -106,6 +112,20 @@ function webform_submissions_acl_nodes_by_user($uid, $id_only = FALSE) {
+   return $nodes;
+ }
+ 
++/*function webform_submissions_acl_users_by_role($nid, $rid, $id_only = FALSE) {
++  $users = array();
++  $result = db_query("SELECT u.uid, u.name, u.status FROM {users} u INNER JOIN {users_roles} ur ON u.uid=ur.uid WHERE ur.rid = %d AND u.status = 1", $rid);
++  foreach ($result as $row) {
++    if ($id_only) {
++      $users[] = $row->uid;
++    }
++    else {
++      $users[] = $row;
++    }
++  }
++  return $users;
++} */
++
+ function webform_submissions_acl_delete($nid, $uid) {
+-  db_query("DELETE FROM {webform_submissions_acl} WHERE nid = %d AND uid = %d", $nid, $uid);
+-}
+\ No newline at end of file
++  db_delete('webform_submissions_acl')->condition('nid', $nid)->condition('uid', $uid)->execute();
++}
+diff --git a/webform_submissions_acl.pages.inc b/webform_submissions_acl.pages.inc
+index d91e2e5..8dbbe7c 100644
+--- a/webform_submissions_acl.pages.inc
++++ b/webform_submissions_acl.pages.inc
+@@ -1,42 +1,45 @@
+ <?php
++// $Id: webform_submissions_acl.pages.inc,v 1.1 2009/10/30 17:49:17 davyvandenbremt Exp $
+ 
+ /**
+  * @file
+  * ACL form.
+  *
+  * @author Davy Van Den Bremt
++ * Modified by: Edouard Poitras <epoitras@layer8.org> on June 27th, 2012 in an attempt to
++ * get it working with Drupal 7
+  */
+-
+-function webform_submissions_acl_page(&$form_state, $node) {
++function webform_submissions_acl_page($form_state, $node) {
+   $node_users = webform_submissions_acl_users_by_node($node->nid);
+-  return theme('webform_submissions_acl_page', drupal_get_form('webform_submissions_acl_form', $node), $node, $node_users);
++  $form = drupal_render(drupal_get_form('webform_submissions_acl_form', $node));
++  return theme('webform_submissions_acl_page', array('form' => $form, 'node' => $node, 'users' => $node_users));
+ }
+ 
+-function theme_webform_submissions_acl_page($form, $node, $users) {
++function theme_webform_submissions_acl_page($variables) {
++  $form = $variables['form'];
++  $node = $variables['node'];
++  $users = $variables['users'];
+   $header = array(t('Username'), t('Operations'));
+   $rows = array();
+-
+   foreach ($users as $user) {
+-    $rows[] = array(l($user->name, 'user/'. $user->uid), l(t('Delete'), 'node/'. $node->nid .'/edit/acl/delete/'. $user->uid));
++    $rows[] = array(l($user->name, 'user/'. $user->uid), l(t('Delete'), 'node/'. $node->nid .'/acl/delete/'. $user->uid));
+   }
+-
+   if (empty($rows)) {
+     $rows[] = array(array('data' => t('No users added yet.'), 'colspan' => '2', 'class' => 'message'));
+   }
+-
+-  return $form . theme('table', $header, $rows);
++  return $form . theme('table', array('header' => $header, 'rows' => $rows));
+ }
+ 
+-function webform_submissions_acl_form(&$form_state, $node) {
++function webform_submissions_acl_form($node, &$form_state) {
++  $nid = $form_state['build_info']['args'][0]->nid;
+   $form = array();
+-
+   $form['new_user'] = array(
+     '#type' => 'fieldset',
+     '#title' => t('Add new user'),
+   );
+   $form['new_user']['nid'] = array(
+     '#type' => 'hidden',
+-    '#default_value' => $node->nid,
++    '#default_value' => $nid,
+   );
+   $form['new_user']['name'] = array(
+     '#type' => 'textfield',
+@@ -50,30 +53,25 @@ function webform_submissions_acl_form(&$form_state, $node) {
+     '#type' => 'submit',
+     '#value' => t('Add'),
+   );
+-
+   return $form;
+ }
+ 
+ function webform_submissions_acl_form_validate($form, &$form_state) {
+   $node_users = webform_submissions_acl_users_by_node($form_state['values']['nid'], TRUE);
+-  $account = user_load(array('name' => $form_state['values']['name']));
+-
++  $account = array_shift(user_load_multiple(array(), array('name' => $form_state['values']['name'])));
+   if (in_array($account->uid, $node_users)) {
+     form_set_error('name', t('User is already added for this form'));
+   }
+-
+-  $account = user_load(array('name' => $form_state['values']['name']));
+-
++  $account = array_shift(user_load_multiple(array(), array('name' => $form_state['values']['name'])));
+   if (!$account) {
+     form_set_error('name', t('Invalid user'));
+   }
+ }
+ 
+ function webform_submissions_acl_form_submit($form, &$form_state) {
+-  $account = user_load(array('name' => $form_state['values']['name']));
+-
++  $account = array_shift(user_load_multiple(array(), array('name' => $form_state['values']['name'])));
+   if ($account) {
+-    db_query("INSERT INTO {webform_submissions_acl} (nid, uid) VALUES (%d, %d)", $form_state['values']['nid'], $account->uid);
++    $id = db_insert('webform_submissions_acl')->fields(array( 'nid' => $form_state['values']['nid'], 'uid' => $account->uid))->execute();
+     drupal_set_message(t('The user was succesfully added.'), 'status');
+   }
+   else {
+@@ -84,7 +82,7 @@ function webform_submissions_acl_form_submit($form, &$form_state) {
+ /**
+  * Menu callback -- Ask for confirmation of acl deletion
+  */
+-function webform_submissions_acl_delete_confirm_form(&$form_state, $node, $account) {
++function webform_submissions_acl_delete_confirm_form($form, &$form_state, $node, $account) {
+   $form['nid'] = array(
+     '#type' => 'value',
+     '#value' => $node->nid,
+@@ -93,10 +91,9 @@ function webform_submissions_acl_delete_confirm_form(&$form_state, $node, $accou
+     '#type' => 'value',
+     '#value' => $account->uid,
+   );
+-
+   return confirm_form($form,
+     t('Are you sure you want to delete access rights for %user from %node?', array('%user' => $account->name, '%node' => $node->title)),
+-    isset($_GET['destination']) ? $_GET['destination'] : 'node/'. $node->nid .'/edit/acl',
++    isset($_GET['destination']) ? $_GET['destination'] : 'node/'. $node->nid .'/acl',
+     t('This action cannot be undone.'),
+     t('Delete'),
+     t('Cancel')
+@@ -107,7 +104,8 @@ function webform_submissions_acl_delete_confirm_form(&$form_state, $node, $accou
+  * Submit handler for executing section acl after confirmation
+  */
+ function webform_submissions_acl_delete_confirm_form_submit($form, &$form_state) {
+-  webform_submissions_acl_delete($form_state['values']['nid'], $form_state['values']['uid']);
+-
+-  $form_state['redirect'] = 'node/'. $form_state['values']['nid'] .'/edit/acl';
+-}
+\ No newline at end of file
++  $nid = $form_state['build_info']['args'][0]->nid;
++  $uid = $form_state['build_info']['args'][1]->uid;
++  webform_submissions_acl_delete($nid, $uid);
++  $form_state['redirect'] = 'node/'. $nid .'/acl';
++}
