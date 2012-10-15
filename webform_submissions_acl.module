@@ -1,10 +1,16 @@
 <?php
+// $Id: webform_submissions_acl.module,v 1.1 2009/10/30 17:49:17 davyvandenbremt Exp $
 
 /**
  * @file
  * Drupal hooks and helper functions.
  *
  * @author Davy Van Den Bremt
+ * Modified by: Edouard Poitras <epoitras@layer8.org> on June 27th, 2012 in an attempt
+ * to get it working with Drupal 7
+ * Thanks to pbosmans (drupal username) for the permissions fix @ http://drupal.org/node/1561834
+ * Thanks to Matt B (drupal username) for the module package placement idea @ http://drupal.org/node/1111124
+ * Thanks to Zyxtrio (drupal username) for the role based ACL code @ http://drupal.org/node/636612
  */
 
 /**
@@ -12,8 +18,7 @@
  */
 function webform_submissions_acl_menu() {
   $items = array();
-
-  $items['node/%webform_menu/edit/acl'] = array(
+  $items['node/%webform_menu/acl'] = array(
     'title' => 'ACL',
     'page callback' => 'webform_submissions_acl_page',
     'page arguments' => array('webform_submissions_acl_page', 1),
@@ -23,8 +28,7 @@ function webform_submissions_acl_menu() {
     'weight' => 3,
     'type' => MENU_LOCAL_TASK,
   );
-
-  $items['node/%webform_menu/edit/acl/delete/%user'] = array(
+  $items['node/%webform_menu/acl/delete/%user'] = array(
     'title' => 'ACL',
     'page callback' => 'drupal_get_form',
     'page arguments' => array('webform_submissions_acl_delete_confirm_form', 1, 5),
@@ -33,7 +37,6 @@ function webform_submissions_acl_menu() {
     'file' => 'webform_submissions_acl.pages.inc',
     'type' => MENU_CALLBACK,
   );
-
   return $items;
 }
 
@@ -42,16 +45,19 @@ function webform_submissions_acl_menu() {
  */
 function webform_submissions_acl_menu_alter(&$callbacks) {
   $callbacks['node/%webform_menu/webform-results']['access callback'] = 'webform_submissions_acl_access';
-  $callbacks['node/%webform_menu/webform-results']['access arguments'] = array(1, 'access webform results');
-
+  $callbacks['node/%webform_menu/webform-results']['access arguments'] = array(1, 'access own webform results');
   $callbacks['node/%webform_menu/webform-results/analysis']['access callback'] = 'webform_submissions_acl_access';
-  $callbacks['node/%webform_menu/webform-results/analysis']['access arguments'] = array(1, 'access webform results');
-
+  $callbacks['node/%webform_menu/webform-results/analysis']['access arguments'] = array(1, 'access own webform results');
   $callbacks['node/%webform_menu/webform-results/table']['access callback'] = 'webform_submissions_acl_access';
-  $callbacks['node/%webform_menu/webform-results/table']['access arguments'] = array(1, 'access webform results');
-
+  $callbacks['node/%webform_menu/webform-results/table']['access arguments'] = array(1, 'access own webform results');
   $callbacks['node/%webform_menu/webform-results/download']['access callback'] = 'webform_submissions_acl_access';
-  $callbacks['node/%webform_menu/webform-results/download']['access arguments'] = array(1, 'access webform results');
+  $callbacks['node/%webform_menu/webform-results/download']['access arguments'] = array(1, 'access own webform results');
+  $callbacks['node/%webform_menu/webform-results/submissions']['access callback'] = 'webform_submissions_acl_access';
+  $callbacks['node/%webform_menu/webform-results/submissions']['access arguments'] = array(1, 'access own webform results');
+  $callbacks['node/%webform_menu/submissions']['access callback'] = 'webform_submissions_acl_access';
+  $callbacks['node/%webform_menu/submissions']['access arguments'] = array(1, 'access own webform results');
+  $callbacks['node/%webform_menu/submission/%webform_menu_submission']['access callback'] = 'webform_submissions_acl_access';
+  $callbacks['node/%webform_menu/submission/%webform_menu_submission']['access arguments'] = array(1, 'access own webform results');
 }
 
 /**
@@ -60,7 +66,7 @@ function webform_submissions_acl_menu_alter(&$callbacks) {
 function webform_submissions_acl_access($node, $perm) {
   global $user;
   $node_users = webform_submissions_acl_users_by_node($node->nid, TRUE);
-  return node_access('view', $node) && (user_access($perm) || in_array($user->uid, $node_users));
+  return node_access('view', $node) && (user_access('access all webform results') || ((user_access($perm) && ($user->uid == $node->uid)) || in_array($user->uid, $node_users)));
 }
 
 /**
@@ -69,7 +75,7 @@ function webform_submissions_acl_access($node, $perm) {
 function webform_submissions_acl_theme($existing, $type, $theme, $path) {
   return array(
     'webform_submissions_acl_page' => array(
-      'arguments' => array(
+      'variables' => array(
         'form' => '',
         'node' => NULL,
         'users' => array()
@@ -80,8 +86,8 @@ function webform_submissions_acl_theme($existing, $type, $theme, $path) {
 
 function webform_submissions_acl_users_by_node($nid, $id_only = FALSE) {
   $users = array();
-  $result = db_query("SELECT wsa.uid, u.name FROM {webform_submissions_acl} wsa INNER JOIN {users} u ON u.uid = wsa.uid WHERE wsa.nid = %d", $nid);
-  while ($row = db_fetch_object($result)) {
+  $result = db_query("SELECT wsa.uid, u.name FROM {webform_submissions_acl} wsa INNER JOIN {users} u ON u.uid = wsa.uid WHERE wsa.nid = :nid", array(':nid' => $nid));
+  foreach ($result as $row) {
     if ($id_only) {
       $users[] = $row->uid;
     }
@@ -94,8 +100,8 @@ function webform_submissions_acl_users_by_node($nid, $id_only = FALSE) {
 
 function webform_submissions_acl_nodes_by_user($uid, $id_only = FALSE) {
   $nodes = array();
-  $result = db_query("SELECT wsa.nid, wsa.title FROM {webform_submissions_acl} wsa INNER JOIN {node} n ON n.nid = wsa.nid WHERE wsa.uid = %d", $uid);
-  while ($row = db_fetch_object($result)) {
+  $result = db_query("SELECT wsa.nid, wsa.title FROM {webform_submissions_acl} wsa INNER JOIN {node} n ON n.nid = wsa.nid WHERE wsa.uid = " . $uid);
+  foreach ($result as $row) {
     if ($id_only) {
       $nodes[] = $row->nid;
     }
@@ -106,6 +112,20 @@ function webform_submissions_acl_nodes_by_user($uid, $id_only = FALSE) {
   return $nodes;
 }
 
+/*function webform_submissions_acl_users_by_role($nid, $rid, $id_only = FALSE) {
+  $users = array();
+  $result = db_query("SELECT u.uid, u.name, u.status FROM {users} u INNER JOIN {users_roles} ur ON u.uid=ur.uid WHERE ur.rid = %d AND u.status = 1", $rid);
+  foreach ($result as $row) {
+    if ($id_only) {
+      $users[] = $row->uid;
+    }
+    else {
+      $users[] = $row;
+    }
+  }
+  return $users;
+} */
+
 function webform_submissions_acl_delete($nid, $uid) {
-  db_query("DELETE FROM {webform_submissions_acl} WHERE nid = %d AND uid = %d", $nid, $uid);
+  db_delete('webform_submissions_acl')->condition('nid', $nid)->condition('uid', $uid)->execute();
 }

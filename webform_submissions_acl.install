@@ -1,4 +1,5 @@
 <?php
+// $Id: webform_submissions_acl.install,v 1.1 2009/10/30 17:49:17 davyvandenbremt Exp $
 
 /**
  * @file
@@ -6,23 +7,6 @@
  *
  * @author Davy Van Den Bremt
  */
-
-/**
- * Implementation of hook_install().
- */
-function webform_submissions_acl_install() {
-  drupal_install_schema('webform_submissions_acl');
-}
-
-/**
- * Implementation of hook_uninstall().
- */
-function webform_submissions_acl_uninstall() {
-  drupal_uninstall_schema('webform_submissions_acl');
-
-  db_query("DELETE FROM {variable} WHERE name LIKE 'webform_submissions_acl_%'");
-  cache_clear_all('variables', 'cache');
-}
 
 /**
  * Implementation of hook_schema().
@@ -49,6 +33,5 @@ function webform_submissions_acl_schema() {
       'uid' => array('uid')
      ),
   );
-
   return $schema;
 }

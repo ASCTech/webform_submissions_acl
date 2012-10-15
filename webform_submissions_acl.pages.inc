@@ -1,42 +1,45 @@
 <?php
+// $Id: webform_submissions_acl.pages.inc,v 1.1 2009/10/30 17:49:17 davyvandenbremt Exp $
 
 /**
  * @file
  * ACL form.
  *
  * @author Davy Van Den Bremt
+ * Modified by: Edouard Poitras <epoitras@layer8.org> on June 27th, 2012 in an attempt to
+ * get it working with Drupal 7
  */
-
-function webform_submissions_acl_page(&$form_state, $node) {
+function webform_submissions_acl_page($form_state, $node) {
   $node_users = webform_submissions_acl_users_by_node($node->nid);
-  return theme('webform_submissions_acl_page', drupal_get_form('webform_submissions_acl_form', $node), $node, $node_users);
+  $form = drupal_render(drupal_get_form('webform_submissions_acl_form', $node));
+  return theme('webform_submissions_acl_page', array('form' => $form, 'node' => $node, 'users' => $node_users));
 }
 
-function theme_webform_submissions_acl_page($form, $node, $users) {
+function theme_webform_submissions_acl_page($variables) {
+  $form = $variables['form'];
+  $node = $variables['node'];
+  $users = $variables['users'];
   $header = array(t('Username'), t('Operations'));
   $rows = array();
-
   foreach ($users as $user) {
-    $rows[] = array(l($user->name, 'user/'. $user->uid), l(t('Delete'), 'node/'. $node->nid .'/edit/acl/delete/'. $user->uid));
+    $rows[] = array(l($user->name, 'user/'. $user->uid), l(t('Delete'), 'node/'. $node->nid .'/acl/delete/'. $user->uid));
   }
-
   if (empty($rows)) {
     $rows[] = array(array('data' => t('No users added yet.'), 'colspan' => '2', 'class' => 'message'));
   }
-
-  return $form . theme('table', $header, $rows);
+  return $form . theme('table', array('header' => $header, 'rows' => $rows));
 }
 
-function webform_submissions_acl_form(&$form_state, $node) {
+function webform_submissions_acl_form($node, &$form_state) {
+  $nid = $form_state['build_info']['args'][0]->nid;
   $form = array();
-
   $form['new_user'] = array(
     '#type' => 'fieldset',
     '#title' => t('Add new user'),
   );
   $form['new_user']['nid'] = array(
     '#type' => 'hidden',
-    '#default_value' => $node->nid,
+    '#default_value' => $nid,
   );
   $form['new_user']['name'] = array(
     '#type' => 'textfield',
@@ -50,30 +53,25 @@ function webform_submissions_acl_form(&$form_state, $node) {
     '#type' => 'submit',
     '#value' => t('Add'),
   );
-
   return $form;
 }
 
 function webform_submissions_acl_form_validate($form, &$form_state) {
   $node_users = webform_submissions_acl_users_by_node($form_state['values']['nid'], TRUE);
-  $account = user_load(array('name' => $form_state['values']['name']));
-
+  $account = array_shift(user_load_multiple(array(), array('name' => $form_state['values']['name'])));
   if (in_array($account->uid, $node_users)) {
     form_set_error('name', t('User is already added for this form'));
   }
-
-  $account = user_load(array('name' => $form_state['values']['name']));
-
+  $account = array_shift(user_load_multiple(array(), array('name' => $form_state['values']['name'])));
   if (!$account) {
     form_set_error('name', t('Invalid user'));
   }
 }
 
 function webform_submissions_acl_form_submit($form, &$form_state) {
-  $account = user_load(array('name' => $form_state['values']['name']));
-
+  $account = array_shift(user_load_multiple(array(), array('name' => $form_state['values']['name'])));
   if ($account) {
-    db_query("INSERT INTO {webform_submissions_acl} (nid, uid) VALUES (%d, %d)", $form_state['values']['nid'], $account->uid);
+    $id = db_insert('webform_submissions_acl')->fields(array( 'nid' => $form_state['values']['nid'], 'uid' => $account->uid))->execute();
     drupal_set_message(t('The user was succesfully added.'), 'status');
   }
   else {
@@ -84,7 +82,7 @@ function webform_submissions_acl_form_submit($form, &$form_state) {
 /**
  * Menu callback -- Ask for confirmation of acl deletion
  */
-function webform_submissions_acl_delete_confirm_form(&$form_state, $node, $account) {
+function webform_submissions_acl_delete_confirm_form($form, &$form_state, $node, $account) {
   $form['nid'] = array(
     '#type' => 'value',
     '#value' => $node->nid,
@@ -93,10 +91,9 @@ function webform_submissions_acl_delete_confirm_form(&$form_state, $node, $accou
     '#type' => 'value',
     '#value' => $account->uid,
   );
-
   return confirm_form($form,
     t('Are you sure you want to delete access rights for %user from %node?', array('%user' => $account->name, '%node' => $node->title)),
-    isset($_GET['destination']) ? $_GET['destination'] : 'node/'. $node->nid .'/edit/acl',
+    isset($_GET['destination']) ? $_GET['destination'] : 'node/'. $node->nid .'/acl',
     t('This action cannot be undone.'),
     t('Delete'),
     t('Cancel')
@@ -107,7 +104,8 @@ function webform_submissions_acl_delete_confirm_form(&$form_state, $node, $accou
  * Submit handler for executing section acl after confirmation
  */
 function webform_submissions_acl_delete_confirm_form_submit($form, &$form_state) {
-  webform_submissions_acl_delete($form_state['values']['nid'], $form_state['values']['uid']);
-
-  $form_state['redirect'] = 'node/'. $form_state['values']['nid'] .'/edit/acl';
+  $nid = $form_state['build_info']['args'][0]->nid;
+  $uid = $form_state['build_info']['args'][1]->uid;
+  webform_submissions_acl_delete($nid, $uid);
+  $form_state['redirect'] = 'node/'. $nid .'/acl';
 }

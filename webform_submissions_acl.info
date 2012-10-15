@@ -1,4 +1,6 @@
 name = Webform Submissions ACL
 description = "Grant individual users access to the results of specific webforms."
-core = 6.x
+version = "7.x-1.x-dev"
+core = 7.x
+package = Webform
 dependencies[] = webform
