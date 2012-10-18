@@ -31,7 +31,7 @@ function webform_submissions_acl_menu() {
   $items['node/%webform_menu/acl/delete/%user'] = array(
     'title' => 'ACL',
     'page callback' => 'drupal_get_form',
-    'page arguments' => array('webform_submissions_acl_delete_confirm_form', 1, 5),
+    'page arguments' => array('webform_submissions_acl_delete_confirm_form', 1, 4),
     'access callback' => 'node_access',
     'access arguments' => array('update', 1),
     'file' => 'webform_submissions_acl.pages.inc',

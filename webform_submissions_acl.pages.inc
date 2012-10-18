@@ -57,14 +57,15 @@ function webform_submissions_acl_form($node, &$form_state) {
 }
 
 function webform_submissions_acl_form_validate($form, &$form_state) {
-  $node_users = webform_submissions_acl_users_by_node($form_state['values']['nid'], TRUE);
-  $account = array_shift(user_load_multiple(array(), array('name' => $form_state['values']['name'])));
-  if (in_array($account->uid, $node_users)) {
-    form_set_error('name', t('User is already added for this form'));
-  }
-  $account = array_shift(user_load_multiple(array(), array('name' => $form_state['values']['name'])));
-  if (!$account) {
-    form_set_error('name', t('Invalid user'));
+    $node_users = webform_submissions_acl_users_by_node($form_state['values']['nid'], TRUE);
+      $account = array_shift(user_load_multiple(array(), array('name' => $form_state['values']['name'])));
+      if (!$account) {
+            form_set_error('name', t('Invalid user'));
+              }
+  else {
+      if (in_array($account->uid, $node_users)) {
+            form_set_error('name', t('User is already added for this form'));
+              }
   }
 }
 
